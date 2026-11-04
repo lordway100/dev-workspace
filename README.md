@@ -45,9 +45,13 @@ Docker 클라이언트가 데몬에 요청 → Docker Hub에서 이미지 pull �
 
 ```bash
 docker run -it ubuntu bash
+cat /etc/os-release
+exit
 ```
 
-<!-- TODO: 스크린샷 추가 (images/ubuntu-run.png) -->
+`-i`(입력 유지)와 `-t`(터미널 할당)로 컨테이너 안의 bash에 접속했다. 컨테이너 내부 OS가 Ubuntu 26.04.1 LTS임을 확인했다.
+
+![ubuntu run](images/ubuntu-run.png)
 
 ### 3-4. 컨테이너 목록 확인
 
@@ -113,7 +117,13 @@ docker run -d -p 8080:80 --name web nginx
 curl http://localhost:8080
 ```
 
-<!-- TODO: 스크린샷 추가 (images/port-mapping.png, images/curl-test.png) -->
+`-d`는 백그라운드 실행, `-p 8080:80`은 호스트 8080 포트를 컨테이너 80 포트에 연결한다. 로컬에 nginx 이미지가 없어 Docker Hub에서 자동으로 pull한 뒤 실행되었다.
+
+![port mapping](images/port-mapping.png)
+
+호스트에서 `localhost:8080`으로 요청하자 컨테이너의 nginx가 응답(`Welcome to nginx!`)하여 포트 매핑이 정상 동작함을 확인했다.
+
+![curl test](images/curl-test.png)
 
 ## 4. 개념 정리
 
