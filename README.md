@@ -231,6 +231,19 @@ sudo kill <PID>                    # 3-b. 일반 프로세스라면 종료
 docker run -d -p 8081:80 nginx     # 또는 다른 호스트 포트 사용
 ```
 
+#### 포트 충돌 재현 로그
+
+| 단계 | 명령 | 결과 |
+|------|------|------|
+| 현상 | `docker run -d -p 8080:80 nginx` | `Bind for 0.0.0.0:8080 failed: port is already allocated` |
+| 확인 | `docker ps --filter "publish=8080"` | 기존 `web` 컨테이너가 8080을 점유 중 |
+| 조치 | `docker rm -f web` | 컨테이너 삭제로 포트 해제 |
+| 검증 | `docker run -d -p 8080:80 --name web nginx` | 컨테이너 ID 출력, 정상 실행 |
+
+과정 중 이미지 이름을 `ngnix`로 잘못 입력해 `pull access denied` 에러도 발생했다. 로컬에 없는 이미지 이름은 Docker Hub에서 찾으려 하므로, 오타가 "저장소가 없음" 에러로 나타난다는 점을 확인했다.
+
+![port conflict](images/port-conflict.png)
+
 ### 볼륨 마운트
 `-v 호스트경로:컨테이너경로` 형식. 컨테이너는 삭제되면 내부 데이터도 사라지므로, 호스트 디렉터리를 연결해 데이터를 유지하거나 코드를 실시간으로 공유한다.
 
@@ -243,6 +256,11 @@ docker volume create mydata
 docker run --rm -v mydata:/data ubuntu bash -c "echo hello > /data/test.txt"
 docker run --rm -v mydata:/data ubuntu cat /data/test.txt   # 첫 컨테이너가 삭제돼도 hello 출력
 ```
+
+#### 데이터 지속성 검증
+첫 번째 컨테이너는 `/data/test.txt`에 `hello`를 쓰고 `--rm` 옵션으로 **종료와 동시에 삭제**되었다. 완전히 새로 만든 두 번째 컨테이너에서 같은 볼륨을 연결해 파일을 읽자 `hello`가 출력되었다. 데이터가 컨테이너가 아닌 볼륨에 저장되어 컨테이너 삭제 후에도 유지됨을 확인했다.
+
+![volume test](images/volume-test.png)
 
 #### 경로 선택 기준과 재현성
 - **컨테이너 경로는 항상 절대 경로** (`/app`, `/data`). Dockerfile의 `WORKDIR /app`과 맞춰 둔다.
