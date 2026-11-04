@@ -33,6 +33,16 @@ docker --version
 
 ![docker version](images/docker-version.png)
 
+`docker --version`은 클라이언트(CLI) 버전만 보여주므로, 데몬(서버)이 실제로 동작하는지는 `docker info`로 확인했다.
+
+```bash
+docker info
+```
+
+`Server:` 항목에 서버 버전(29.9.2), 컨테이너·이미지 수, 스토리지 드라이버(overlayfs), Cgroup 드라이버(systemd) 정보가 출력되어 데몬이 정상 실행 중임을 확인했다. 데몬이 꺼져 있으면 `Cannot connect to the Docker daemon` 에러가 출력된다.
+
+![docker info](images/docker-info.png)
+
 ### 3-2. hello-world 컨테이너 실행
 
 ```bash
