@@ -21,6 +21,8 @@ dev-workspace/
 └── images/              # 실행 결과 스크린샷
 ```
 
+구성 기준: 이미지 빌드에 필요한 파일은 `docker-env/`에 모아 빌드 컨텍스트를 작게 유지하고(불필요한 파일이 이미지 빌드에 전송되지 않음), 문서용 증거 자료는 `images/`로 분리했다.
+
 ## 3. 설치 및 실행 과정
 
 ### 3-1. Docker 설치 확인
@@ -78,7 +80,21 @@ chmod 755 get-docker.sh
 ls -l
 ```
 
-`755` = 소유자 읽기/쓰기/실행(rwx), 그룹·기타 읽기/실행(r-x). 실행 후 `get-docker.sh`의 권한이 `-rwxr-xr-x`로 바뀐 것을 확인했다.
+권한은 소유자(user) / 그룹(group) / 기타(other) 세 자리로 표시하며, 각 자리는 아래 값의 합이다.
+
+| 기호 | 의미 | 숫자 |
+|------|------|------|
+| `r` | 읽기 | 4 |
+| `w` | 쓰기 | 2 |
+| `x` | 실행 (디렉터리는 진입) | 1 |
+
+| 숫자 | 기호 | 용도 예시 |
+|------|------|-----------|
+| `755` | `rwxr-xr-x` | 실행 스크립트, 디렉터리 |
+| `644` | `rw-r--r--` | 일반 파일 (README 등) |
+| `600` | `rw-------` | 비밀 키 등 본인만 읽는 파일 |
+
+`get-docker.sh`는 직접 실행해야 하므로 `755`를 주었다. 실행 후 권한이 `-rwxr-xr-x`로 바뀌고 파일명이 실행 파일 색(초록)으로 표시되는 것을 확인했다.
 
 ![chmod](images/chmod-ls.png)
 
@@ -147,6 +163,15 @@ Windows Subsystem for Linux 2. Windows 안에서 경량 가상머신으로 실�
 - **이미지**: 실행에 필요한 파일과 설정을 담은 읽기 전용 템플릿 (클래스에 비유)
 - **컨테이너**: 이미지를 실행한 인스턴스. 하나의 이미지로 여러 컨테이너를 만들 수 있다 (객체에 비유)
 
+| 단계 | 명령 | 결과 |
+|------|------|------|
+| 빌드 | `docker build` | Dockerfile → 이미지 생성 (변경 불가 레이어) |
+| 실행 | `docker run` | 이미지 위에 쓰기 가능한 레이어를 얹어 컨테이너 생성 |
+| 변경 | 컨테이너 안에서 파일 수정 | 그 컨테이너의 쓰기 레이어에만 기록, **이미지는 그대로** |
+| 삭제 | `docker rm` | 쓰기 레이어(변경 내용)도 함께 사라짐 |
+
+그래서 변경 사항을 남기려면 Dockerfile을 고쳐 다시 빌드하거나, 데이터는 볼륨에 저장해야 한다.
+
 ### Dockerfile 주요 문법
 
 | 명령 | 의미 |
@@ -160,13 +185,51 @@ Windows Subsystem for Linux 2. Windows 안에서 경량 가상머신으로 실�
 | `CMD` | 컨테이너 시작 시 기본 실행 명령 |
 
 ### 포트 매핑
-`-p 호스트포트:컨테이너포트` 형식. 예) `-p 8080:80`은 호스트의 8080번 포트로 들어온 요청을 컨테이너의 80번 포트로 전달한다. 컨테이너는 격리된 네트워크를 쓰기 때문에 외부에서 접속하려면 포트 매핑이 필요하다.
+`-p 호스트포트:컨테이너포트` 형식. 예) `-p 8080:80`은 호스트의 8080번 포트로 들어온 요청을 컨테이너의 80번 포트로 전달한다. 컨테이너는 **네트워크 네임스페이스**로 격리되어 자기만의 IP와 포트 공간을 가진다. 그래서 컨테이너 안의 nginx가 80번에서 대기해도 호스트의 `localhost:80`과는 무관하며, Docker가 호스트 포트로 들어온 요청을 컨테이너 포트로 전달(포트 포워딩)하도록 `-p`로 지정해야 외부에서 접근할 수 있다.
+
+#### 포트 충돌 진단 절차
+`Bind for 0.0.0.0:8080 failed: port is already allocated` 같은 에러가 나면:
+
+```bash
+sudo ss -tlnp | grep 8080          # 1. 호스트에서 8080을 점유한 프로세스 확인
+docker ps --filter "publish=8080"  # 2. 다른 컨테이너가 쓰는지 확인
+docker rm -f <컨테이너>             # 3-a. 컨테이너라면 중지/삭제
+sudo kill <PID>                    # 3-b. 일반 프로세스라면 종료
+docker run -d -p 8081:80 nginx     # 또는 다른 호스트 포트 사용
+```
 
 ### 볼륨 마운트
 `-v 호스트경로:컨테이너경로` 형식. 컨테이너는 삭제되면 내부 데이터도 사라지므로, 호스트 디렉터리를 연결해 데이터를 유지하거나 코드를 실시간으로 공유한다.
 
 ```bash
+# 바인드 마운트: 호스트의 현재 폴더를 컨테이너 /app에 연결
 docker run -it -v $(pwd):/app my-ubuntu
+
+# 네임드 볼륨: Docker가 관리하는 저장소 사용
+docker volume create mydata
+docker run --rm -v mydata:/data ubuntu bash -c "echo hello > /data/test.txt"
+docker run --rm -v mydata:/data ubuntu cat /data/test.txt   # 첫 컨테이너가 삭제돼도 hello 출력
+```
+
+#### 경로 선택 기준과 재현성
+- **컨테이너 경로는 항상 절대 경로** (`/app`, `/data`). Dockerfile의 `WORKDIR /app`과 맞춰 둔다.
+- **호스트 경로도 절대 경로여야 한다.** `-v ./src:/app`처럼 상대 경로를 쓰면 실행 위치에 따라 결과가 달라지므로, `$(pwd)`로 현재 위치를 절대 경로로 바꿔 쓰고 항상 저장소 루트에서 실행한다.
+- `/home/lordway100/...`처럼 특정 사용자 경로를 하드코딩하면 다른 PC에서 재현되지 않는다.
+- WSL에서는 Windows 경로(`/mnt/c/...`)보다 Linux 경로(`~/...`)가 파일 I/O가 훨씬 빠르고 권한 문제가 적다.
+
+#### 데이터 손실 방지
+
+| 방식 | 저장 위치 | 장점 | 적합한 용도 |
+|------|-----------|------|-------------|
+| 컨테이너 내부 | 쓰기 레이어 | 간단 | 임시 데이터 (삭제 시 사라짐) |
+| 바인드 마운트 | 호스트 폴더 | 호스트에서 바로 편집 가능 | 소스 코드 개발 |
+| 네임드 볼륨 | Docker 관리 영역 | 경로·권한 문제 적음, 컨테이너 간 공유 | DB 데이터 등 |
+
+볼륨도 `docker volume rm`이나 디스크 손상 시 사라지므로 중요한 데이터는 백업한다.
+
+```bash
+docker run --rm -v mydata:/data -v $(pwd):/backup ubuntu \
+  tar czf /backup/mydata-backup.tar.gz -C /data .
 ```
 
 ### 환경 변수
@@ -175,3 +238,41 @@ docker run -it -v $(pwd):/app my-ubuntu
 ```bash
 docker run -e APP_ENV=dev my-ubuntu env
 ```
+
+## 5. 트러블슈팅 사례
+
+### WSL 배포판 import 실패 (`Wsl/ERROR_PATH_NOT_FOUND`)
+
+**현상**
+기존 Ubuntu 백업(`D:\ubuntu-backup.tar`)을 새 배포판으로 가져오려 했으나 실패했다.
+
+```powershell
+wsl --import Ubuntu C:\WSL\Ubuntu D:\ubuntu-backup.tar
+# 지정된 경로를 찾을 수 없습니다.
+# 오류 코드: Wsl/ERROR_PATH_NOT_FOUND
+```
+
+![wsl import error](images/wsl-import-error.png)
+
+**가설**
+1. `Ubuntu`라는 이름의 배포판이 이미 등록되어 있어 충돌한다.
+2. 백업 파일 `D:\ubuntu-backup.tar` 경로가 틀렸다.
+3. 설치 위치 폴더 `C:\WSL\Ubuntu2`가 존재하지 않는다.
+
+**확인**
+- `wsl -l -v` → `Ubuntu`가 이미 등록되어 있음 → 이름을 `Ubuntu2`로 바꿈.
+- 이름을 바꿔도 같은 에러 발생 → 가설 1은 이 에러의 원인이 아님.
+- `Test-Path D:\ubuntu-backup.tar` → `True` → 가설 2 기각.
+- 남은 원인은 설치 폴더 부재.
+
+**조치**
+```powershell
+mkdir C:\WSL\Ubuntu2
+wsl --import Ubuntu2 C:\WSL\Ubuntu2 D:\ubuntu-backup.tar
+# 작업을 완료했습니다.
+```
+
+![wsl import fix](images/wsl-import-fix.png)
+
+**결론**
+`wsl --import`는 설치 위치 폴더를 자동으로 만들지 않는다. 대상 폴더를 먼저 만들고, 기존 배포판과 겹치지 않는 이름을 써야 한다. 에러 메시지만으로는 어느 경로가 없는지 알 수 없으므로 `Test-Path`로 경로를 하나씩 확인하는 것이 빨랐다.
