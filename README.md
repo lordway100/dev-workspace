@@ -149,6 +149,18 @@ Windows Subsystem for Linux 2. Windows 안에서 경량 가상머신으로 실�
 ### Docker
 애플리케이션과 실행에 필요한 라이브러리·설정을 하나의 이미지로 묶어, 어느 환경에서든 같은 방식으로 실행할 수 있게 해주는 컨테이너 플랫폼이다. "내 PC에선 되는데" 문제를 줄여준다.
 
+- **Docker 엔진**: 이미지를 받아 컨테이너로 실행해 주는 실행기. 그 자체로는 아무 애플리케이션도 들어 있지 않다.
+- **이미지**: OS 파일·프로그램·라이브러리·설정을 통째로 묶은 패키지. 실제로 실행되는 내용물이다.
+- **Docker Hub**: 이미지를 공유하는 공개 저장소(레지스트리). `docker run nginx`를 실행했을 때 로컬에 이미지가 없으면 Docker Hub에서 자동으로 내려받는다(pull). 한 번 받은 이미지는 로컬에 저장되어 다음부터는 바로 실행된다.
+
+```
+Unable to find image 'nginx:latest' locally   ← 로컬에 없음
+latest: Pulling from library/nginx            ← Docker Hub에서 다운로드
+Status: Downloaded newer image for nginx:latest
+```
+
+일관성은 이미지에서 나온다. 같은 이미지를 받으면 어느 PC에서든 내부 파일이 동일하므로 같은 환경이 재현된다. 이 과제의 `my-ubuntu`는 Docker Hub의 `ubuntu` 이미지 위에 python3·git·curl을 설치해 **직접 만든** 이미지로, Dockerfile만 있으면 다른 PC에서도 `docker build`로 같은 이미지를 다시 만들 수 있다.
+
 ### 컨테이너 vs 가상머신
 
 | 구분 | 컨테이너 | 가상머신 |
