@@ -151,6 +151,17 @@ curl http://localhost:8080
 
 ![curl test](images/curl-test.png)
 
+### 3-10. GitHub 연동
+
+```bash
+git remote -v
+git log --oneline -5
+```
+
+`origin`이 GitHub 저장소(`lordway100/dev-workspace`)로 fetch·push 모두 연결되어 있고, 로컬 `main`이 `origin/main`과 같은 커밋을 가리켜 작업 내역이 GitHub에 push되었음을 확인했다. 교육장 PC와 집 PC 등 여러 환경에서 `git clone` → 작업 → `push` 흐름으로 이어서 작업했다.
+
+![git remote and log](images/git-remote-log.png)
+
 ## 4. 개념 정리
 
 ### WSL2
