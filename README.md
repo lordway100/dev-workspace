@@ -286,6 +286,32 @@ docker run --rm -v mydata:/data ubuntu cat /data/test.txt   # 첫 컨테이너�
 
 ![volume test](images/volume-test.png)
 
+#### 바인드 마운트 실습
+호스트의 `bind-test/` 폴더를 컨테이너의 `/app`에 연결해 **양방향으로 공유되는지** 확인했다.
+
+```bash
+mkdir -p bind-test
+echo "hello from host" > bind-test/host.txt
+
+# ① 호스트 → 컨테이너: 호스트에서 만든 파일을 컨테이너에서 읽기
+docker run --rm -v $(pwd)/bind-test:/app ubuntu cat /app/host.txt
+# hello from host
+
+# ② 컨테이너 → 호스트: 컨테이너에서 만든 파일이 호스트 폴더에 생기는지
+docker run --rm -v $(pwd)/bind-test:/app ubuntu bash -c "echo from container > /app/new2.txt"
+ls -la bind-test
+cat bind-test/new2.txt
+# from container
+```
+
+![bind mount test](images/bind-mount-test.png)
+
+**확인한 점**
+- ①에서 호스트에서 만든 `host.txt`를 컨테이너 안의 `/app/host.txt`로 읽을 수 있었다.
+- ②에서 컨테이너가 `/app`에 쓴 `new2.txt`가 호스트의 `bind-test/`에 그대로 생겼다. 두 컨테이너 모두 `--rm`으로 삭제되었지만 파일은 호스트 폴더에 남아 있다.
+- **소유자 주의점**: 컨테이너는 기본적으로 root로 실행되기 때문에, 컨테이너가 만든 `new.txt`, `new2.txt`의 소유자가 `root`로 표시된다. 호스트의 일반 사용자 계정으로 수정·삭제하려면 `sudo`가 필요할 수 있다. 실무에서는 `--user $(id -u):$(id -g)` 옵션으로 호스트 사용자와 같은 권한으로 실행해 이 문제를 피한다.
+- **실수와 원인**: 처음에 `-v (pwd)/bind-test:/app`처럼 `$`를 빠뜨려 `syntax error near unexpected token '('`가 발생했다. `$(pwd)`는 "pwd 명령의 결과로 바꿔 넣으라"는 셸 문법이라 `$`가 반드시 필요하다.
+
 #### 경로 선택 기준과 재현성
 - **컨테이너 경로는 항상 절대 경로** (`/app`, `/data`). Dockerfile의 `WORKDIR /app`과 맞춰 둔다.
 - **호스트 경로도 절대 경로여야 한다.** `-v ./src:/app`처럼 상대 경로를 쓰면 실행 위치에 따라 결과가 달라지므로, `$(pwd)`로 현재 위치를 절대 경로로 바꿔 쓰고 항상 저장소 루트에서 실행한다.
